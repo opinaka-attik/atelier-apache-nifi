@@ -1,0 +1,81 @@
+version: "3.8"
+
+services:
+
+  nifi:
+    image: apache/nifi:1.25.0
+    container_name: nifi
+    ports:
+      - "8443:8443"
+    environment:
+      - SINGLE_USER_CREDENTIALS_USERNAME=admin
+      - SINGLE_USER_CREDENTIALS_PASSWORD=adminpassword123
+      - NIFI_WEB_HTTPS_PORT=8443
+    volumes:
+      - nifi_conf:/opt/nifi/nifi-current/conf
+      - nifi_state:/opt/nifi/nifi-current/state
+      - nifi_db:/opt/nifi/nifi-current/database_repository
+      - nifi_flowfile:/opt/nifi/nifi-current/flowfile_repository
+      - nifi_content:/opt/nifi/nifi-current/content_repository
+      - nifi_provenance:/opt/nifi/nifi-current/provenance_repository
+      - nifi_logs:/opt/nifi/nifi-current/logs
+      - ../flows:/opt/nifi/flows
+      - ../data:/opt/nifi/data
+    healthcheck:
+      test: ["CMD", "curl", "-kf", "https://localhost:8443/nifi"]
+      interval: 30s
+      timeout: 10s
+      retries: 10
+      start_period: 120s
+    restart: unless-stopped
+    networks:
+      - nifi-net
+
+  nifi-postgres:
+    image: postgres:15-alpine
+    container_name: nifi-postgres
+    ports:
+      - "5433:5432"
+    environment:
+      POSTGRES_DB: nifidb
+      POSTGRES_USER: nifiuser
+      POSTGRES_PASSWORD: nifipass
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ../data/init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U nifiuser -d nifidb"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+    networks:
+      - nifi-net
+
+  nifi-registry:
+    image: apache/nifi-registry:1.25.0
+    container_name: nifi-registry
+    ports:
+      - "18080:18080"
+    volumes:
+      - registry_data:/opt/nifi-registry/nifi-registry-current/database
+      - registry_flow:/opt/nifi-registry/nifi-registry-current/flow_storage
+    restart: unless-stopped
+    networks:
+      - nifi-net
+
+volumes:
+  nifi_conf:
+  nifi_state:
+  nifi_db:
+  nifi_flowfile:
+  nifi_content:
+  nifi_provenance:
+  nifi_logs:
+  postgres_data:
+  registry_data:
+  registry_flow:
+
+networks:
+  nifi-net:
+    driver: bridge
