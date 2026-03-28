@@ -1,0 +1,91 @@
+{
+  "encodingVersion": "1.0",
+  "maxTimerDrivenThreadCount": 10,
+  "rootGroup": {
+    "identifier": "flow-02-csv",
+    "instanceIdentifier": "flow-02-csv-inst",
+    "name": "02 - CSV vers PostgreSQL",
+    "comments": "Lire un fichier CSV et inserer les donnees dans PostgreSQL",
+    "processors": [
+      {
+        "identifier": "proc-getfile-02",
+        "name": "GetFile",
+        "comments": "Lit les fichiers CSV depuis /opt/nifi/data/",
+        "type": "org.apache.nifi.processors.standard.GetFile",
+        "bundle": { "group": "org.apache.nifi", "artifact": "nifi-standard-nar", "version": "1.25.0" },
+        "properties": {
+          "Input Directory": "/opt/nifi/data",
+          "File Filter": "[^\\.].*\\.csv",
+          "Keep Source File": "true",
+          "Recurse Subdirectories": "false"
+        },
+        "schedulingStrategy": "TIMER_DRIVEN",
+        "schedulingPeriod": "30 sec",
+        "autoTerminatedRelationships": [],
+        "position": { "x": 100, "y": 150 }
+      },
+      {
+        "identifier": "proc-splitrecord-02",
+        "name": "SplitRecord",
+        "comments": "Divise le CSV en enregistrements individuels",
+        "type": "org.apache.nifi.processors.standard.SplitRecord",
+        "bundle": { "group": "org.apache.nifi", "artifact": "nifi-standard-nar", "version": "1.25.0" },
+        "properties": {
+          "Record Reader": "CSVReader",
+          "Record Writer": "JsonRecordSetWriter",
+          "Records Per Split": "1"
+        },
+        "schedulingStrategy": "TIMER_DRIVEN",
+        "schedulingPeriod": "0 sec",
+        "autoTerminatedRelationships": ["failure", "original"],
+        "position": { "x": 380, "y": 150 }
+      },
+      {
+        "identifier": "proc-putdb-02",
+        "name": "PutDatabaseRecord",
+        "comments": "Insere les enregistrements dans la table commandes",
+        "type": "org.apache.nifi.processors.standard.PutDatabaseRecord",
+        "bundle": { "group": "org.apache.nifi", "artifact": "nifi-standard-nar", "version": "1.25.0" },
+        "properties": {
+          "Record Reader": "JsonTreeReader",
+          "Statement Type": "INSERT",
+          "Database Connection Pooling Service": "DBCPConnectionPool-postgres",
+          "Schema Name": "public",
+          "Table Name": "commandes"
+        },
+        "schedulingStrategy": "TIMER_DRIVEN",
+        "schedulingPeriod": "0 sec",
+        "autoTerminatedRelationships": ["success", "failure", "retry"],
+        "position": { "x": 660, "y": 150 }
+      }
+    ],
+    "connections": [
+      {
+        "identifier": "conn-getfile-split-02",
+        "source": { "id": "proc-getfile-02", "type": "PROCESSOR", "groupId": "flow-02-csv" },
+        "destination": { "id": "proc-splitrecord-02", "type": "PROCESSOR", "groupId": "flow-02-csv" },
+        "selectedRelationships": ["success"]
+      },
+      {
+        "identifier": "conn-split-putdb-02",
+        "source": { "id": "proc-splitrecord-02", "type": "PROCESSOR", "groupId": "flow-02-csv" },
+        "destination": { "id": "proc-putdb-02", "type": "PROCESSOR", "groupId": "flow-02-csv" },
+        "selectedRelationships": ["splits"]
+      }
+    ],
+    "processGroups": [],
+    "remoteProcessGroups": [],
+    "inputPorts": [],
+    "outputPorts": [],
+    "funnels": [],
+    "labels": [
+      {
+        "identifier": "label-02",
+        "label": "Module 02 : GetFile (CSV) -> SplitRecord -> PutDatabaseRecord (PostgreSQL)\nPre-requis : Deposer un fichier CSV dans /opt/nifi/data/",
+        "position": { "x": 100, "y": 60 },
+        "width": 700,
+        "height": 70
+      }
+    ]
+  }
+}
