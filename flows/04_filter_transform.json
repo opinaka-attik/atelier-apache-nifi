@@ -1,0 +1,111 @@
+{
+  "encodingVersion": "1.0",
+  "maxTimerDrivenThreadCount": 10,
+  "rootGroup": {
+    "identifier": "flow-04-filter",
+    "instanceIdentifier": "flow-04-filter-inst",
+    "name": "04 - Filtrage et Transformation",
+    "comments": "Lire des commandes PostgreSQL, filtrer et transformer les donnees",
+    "processors": [
+      {
+        "identifier": "proc-querydb-04",
+        "name": "QueryDatabaseTable",
+        "comments": "Lit incrementalement la table commandes",
+        "type": "org.apache.nifi.processors.standard.QueryDatabaseTable",
+        "bundle": { "group": "org.apache.nifi", "artifact": "nifi-standard-nar", "version": "1.25.0" },
+        "properties": {
+          "Database Connection Pooling Service": "DBCPConnectionPool-postgres",
+          "Database Type": "PostgreSQL",
+          "Table Name": "commandes",
+          "Columns to Return": "id, client_id, produit, montant, statut, created_at",
+          "Maximum-value Columns": "id",
+          "Output Format": "Avro"
+        },
+        "schedulingStrategy": "TIMER_DRIVEN",
+        "schedulingPeriod": "30 sec",
+        "autoTerminatedRelationships": [],
+        "position": { "x": 100, "y": 200 }
+      },
+      {
+        "identifier": "proc-convertavro-04",
+        "name": "ConvertAvroToJSON",
+        "comments": "Convertit Avro en JSON pour traitement",
+        "type": "org.apache.nifi.processors.avro.ConvertAvroToJSON",
+        "bundle": { "group": "org.apache.nifi", "artifact": "nifi-avro-nar", "version": "1.25.0" },
+        "properties": {
+          "JSON container options": "array",
+          "Wrap Single Record": "false"
+        },
+        "schedulingStrategy": "TIMER_DRIVEN",
+        "schedulingPeriod": "0 sec",
+        "autoTerminatedRelationships": ["failure"],
+        "position": { "x": 380, "y": 200 }
+      },
+      {
+        "identifier": "proc-split-04",
+        "name": "SplitJson",
+        "comments": "Separe en records individuels",
+        "type": "org.apache.nifi.processors.standard.SplitJson",
+        "bundle": { "group": "org.apache.nifi", "artifact": "nifi-standard-nar", "version": "1.25.0" },
+        "properties": {
+          "JsonPath Expression": "$.*"
+        },
+        "schedulingStrategy": "TIMER_DRIVEN",
+        "schedulingPeriod": "0 sec",
+        "autoTerminatedRelationships": ["original"],
+        "position": { "x": 660, "y": 200 }
+      },
+      {
+        "identifier": "proc-route-04",
+        "name": "RouteOnAttribute",
+        "comments": "Route selon le statut : completed -> succes, autres -> pending",
+        "type": "org.apache.nifi.processors.standard.RouteOnAttribute",
+        "bundle": { "group": "org.apache.nifi", "artifact": "nifi-standard-nar", "version": "1.25.0" },
+        "properties": {
+          "Routing Strategy": "Route to Property name",
+          "completed": "${statut:equals('completed')}",
+          "pending": "${statut:equals('pending')}",
+          "shipped": "${statut:equals('shipped')}"
+        },
+        "schedulingStrategy": "TIMER_DRIVEN",
+        "schedulingPeriod": "0 sec",
+        "autoTerminatedRelationships": ["unmatched", "completed", "pending", "shipped"],
+        "position": { "x": 940, "y": 200 }
+      }
+    ],
+    "connections": [
+      {
+        "identifier": "conn-querydb-avro-04",
+        "source": { "id": "proc-querydb-04", "type": "PROCESSOR", "groupId": "flow-04-filter" },
+        "destination": { "id": "proc-convertavro-04", "type": "PROCESSOR", "groupId": "flow-04-filter" },
+        "selectedRelationships": ["success"]
+      },
+      {
+        "identifier": "conn-avro-split-04",
+        "source": { "id": "proc-convertavro-04", "type": "PROCESSOR", "groupId": "flow-04-filter" },
+        "destination": { "id": "proc-split-04", "type": "PROCESSOR", "groupId": "flow-04-filter" },
+        "selectedRelationships": ["success"]
+      },
+      {
+        "identifier": "conn-split-route-04",
+        "source": { "id": "proc-split-04", "type": "PROCESSOR", "groupId": "flow-04-filter" },
+        "destination": { "id": "proc-route-04", "type": "PROCESSOR", "groupId": "flow-04-filter" },
+        "selectedRelationships": ["split"]
+      }
+    ],
+    "processGroups": [],
+    "remoteProcessGroups": [],
+    "inputPorts": [],
+    "outputPorts": [],
+    "funnels": [],
+    "labels": [
+      {
+        "identifier": "label-04",
+        "label": "Module 04 : QueryDatabaseTable -> ConvertAvroToJSON -> SplitJson -> RouteOnAttribute\nFiltrage des commandes par statut (completed / pending / shipped)",
+        "position": { "x": 100, "y": 100 },
+        "width": 900,
+        "height": 70
+      }
+    ]
+  }
+}
