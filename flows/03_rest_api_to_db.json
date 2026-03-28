@@ -1,0 +1,114 @@
+{
+  "encodingVersion": "1.0",
+  "maxTimerDrivenThreadCount": 10,
+  "rootGroup": {
+    "identifier": "flow-03-rest",
+    "instanceIdentifier": "flow-03-rest-inst",
+    "name": "03 - API REST vers PostgreSQL",
+    "comments": "Consommer une API REST (jsonplaceholder) et stocker en base",
+    "processors": [
+      {
+        "identifier": "proc-invoke-03",
+        "name": "InvokeHTTP",
+        "comments": "Appel GET https://jsonplaceholder.typicode.com/users",
+        "type": "org.apache.nifi.processors.standard.InvokeHTTP",
+        "bundle": { "group": "org.apache.nifi", "artifact": "nifi-standard-nar", "version": "1.25.0" },
+        "properties": {
+          "HTTP Method": "GET",
+          "Remote URL": "https://jsonplaceholder.typicode.com/users",
+          "Content-Type": "application/json",
+          "Response Body Attribute Name": "",
+          "Ignore response's content": "false"
+        },
+        "schedulingStrategy": "TIMER_DRIVEN",
+        "schedulingPeriod": "60 sec",
+        "autoTerminatedRelationships": ["No Retry", "Original"],
+        "position": { "x": 100, "y": 150 }
+      },
+      {
+        "identifier": "proc-split-03",
+        "name": "SplitJson",
+        "comments": "Separe le tableau JSON en FlowFiles individuels",
+        "type": "org.apache.nifi.processors.standard.SplitJson",
+        "bundle": { "group": "org.apache.nifi", "artifact": "nifi-standard-nar", "version": "1.25.0" },
+        "properties": {
+          "JsonPath Expression": "$.*",
+          "Null Value Representation": "empty string"
+        },
+        "schedulingStrategy": "TIMER_DRIVEN",
+        "schedulingPeriod": "0 sec",
+        "autoTerminatedRelationships": ["failure", "original"],
+        "position": { "x": 380, "y": 150 }
+      },
+      {
+        "identifier": "proc-extract-03",
+        "name": "EvaluateJsonPath",
+        "comments": "Extrait les champs id, name, email, phone, website",
+        "type": "org.apache.nifi.processors.standard.EvaluateJsonPath",
+        "bundle": { "group": "org.apache.nifi", "artifact": "nifi-standard-nar", "version": "1.25.0" },
+        "properties": {
+          "Destination": "flowfile-attribute",
+          "user.id": "$.id",
+          "user.name": "$.name",
+          "user.email": "$.email",
+          "user.phone": "$.phone",
+          "user.website": "$.website"
+        },
+        "schedulingStrategy": "TIMER_DRIVEN",
+        "schedulingPeriod": "0 sec",
+        "autoTerminatedRelationships": ["failure", "unmatched"],
+        "position": { "x": 660, "y": 150 }
+      },
+      {
+        "identifier": "proc-putdb-03",
+        "name": "PutSQL",
+        "comments": "Insere ou met a jour les utilisateurs API dans PostgreSQL",
+        "type": "org.apache.nifi.processors.standard.PutSQL",
+        "bundle": { "group": "org.apache.nifi", "artifact": "nifi-standard-nar", "version": "1.25.0" },
+        "properties": {
+          "JDBC Connection Pool": "DBCPConnectionPool-postgres",
+          "SQL Statement": "INSERT INTO api_users (id, name, email, phone, website) VALUES (${user.id}, '${user.name}', '${user.email}', '${user.phone}', '${user.website}') ON CONFLICT (id) DO UPDATE SET name=EXCLUDED.name, email=EXCLUDED.email",
+          "Batch Size": "100"
+        },
+        "schedulingStrategy": "TIMER_DRIVEN",
+        "schedulingPeriod": "0 sec",
+        "autoTerminatedRelationships": ["success", "failure", "retry"],
+        "position": { "x": 940, "y": 150 }
+      }
+    ],
+    "connections": [
+      {
+        "identifier": "conn-invoke-split-03",
+        "source": { "id": "proc-invoke-03", "type": "PROCESSOR", "groupId": "flow-03-rest" },
+        "destination": { "id": "proc-split-03", "type": "PROCESSOR", "groupId": "flow-03-rest" },
+        "selectedRelationships": ["Response"]
+      },
+      {
+        "identifier": "conn-split-extract-03",
+        "source": { "id": "proc-split-03", "type": "PROCESSOR", "groupId": "flow-03-rest" },
+        "destination": { "id": "proc-extract-03", "type": "PROCESSOR", "groupId": "flow-03-rest" },
+        "selectedRelationships": ["split"]
+      },
+      {
+        "identifier": "conn-extract-put-03",
+        "source": { "id": "proc-extract-03", "type": "PROCESSOR", "groupId": "flow-03-rest" },
+        "destination": { "id": "proc-putdb-03", "type": "PROCESSOR", "groupId": "flow-03-rest" },
+        "selectedRelationships": ["matched"]
+      }
+    ],
+    "processGroups": [],
+    "remoteProcessGroups": [],
+    "inputPorts": [],
+    "outputPorts": [],
+    "funnels": [],
+    "labels": [
+      {
+        "identifier": "label-03",
+        "label": "Module 03 : InvokeHTTP -> SplitJson -> EvaluateJsonPath -> PutSQL\nAPI : https://jsonplaceholder.typicode.com/users",
+        "position": { "x": 100, "y": 60 },
+        "width": 900,
+        "height": 70
+      }
+    ]
+  }
+}
