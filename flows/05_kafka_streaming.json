@@ -1,0 +1,96 @@
+{
+  "encodingVersion": "1.0",
+  "maxTimerDrivenThreadCount": 10,
+  "rootGroup": {
+    "identifier": "flow-05-kafka",
+    "instanceIdentifier": "flow-05-kafka-inst",
+    "name": "05 - Kafka Streaming vers PostgreSQL",
+    "comments": "Consommer des messages Kafka et les persister dans PostgreSQL",
+    "processors": [
+      {
+        "identifier": "proc-consumekafka-05",
+        "name": "ConsumeKafka_2_6",
+        "comments": "Consomme des messages depuis le topic nifi-events",
+        "type": "org.apache.nifi.processors.kafka.pubsub.ConsumeKafka_2_6",
+        "bundle": { "group": "org.apache.nifi", "artifact": "nifi-kafka-2-6-nar", "version": "1.25.0" },
+        "properties": {
+          "bootstrap.servers": "kafka:9092",
+          "topic": "nifi-events",
+          "group.id": "nifi-consumer-group",
+          "auto.offset.reset": "latest",
+          "key-attribute-encoding": "utf-8",
+          "message-demarcator": "",
+          "max.poll.records": "10000",
+          "Communications Timeout": "60 secs"
+        },
+        "schedulingStrategy": "TIMER_DRIVEN",
+        "schedulingPeriod": "0 sec",
+        "autoTerminatedRelationships": [],
+        "position": { "x": 100, "y": 200 }
+      },
+      {
+        "identifier": "proc-parserecord-05",
+        "name": "ParseRecord",
+        "comments": "Parse le message JSON Kafka",
+        "type": "org.apache.nifi.processors.standard.ParseRecord",
+        "bundle": { "group": "org.apache.nifi", "artifact": "nifi-standard-nar", "version": "1.25.0" },
+        "properties": {
+          "Record Reader": "JsonTreeReader",
+          "Record Writer": "JsonRecordSetWriter",
+          "Schema Write Strategy": "no-schema"
+        },
+        "schedulingStrategy": "TIMER_DRIVEN",
+        "schedulingPeriod": "0 sec",
+        "autoTerminatedRelationships": ["failure"],
+        "position": { "x": 380, "y": 200 }
+      },
+      {
+        "identifier": "proc-putdb-05",
+        "name": "PutDatabaseRecord",
+        "comments": "Persiste les events Kafka dans la table kafka_events",
+        "type": "org.apache.nifi.processors.standard.PutDatabaseRecord",
+        "bundle": { "group": "org.apache.nifi", "artifact": "nifi-standard-nar", "version": "1.25.0" },
+        "properties": {
+          "Record Reader": "JsonTreeReader",
+          "Statement Type": "INSERT",
+          "Database Connection Pooling Service": "DBCPConnectionPool-postgres",
+          "Schema Name": "public",
+          "Table Name": "kafka_events",
+          "Maximum Batch Size": "1000"
+        },
+        "schedulingStrategy": "TIMER_DRIVEN",
+        "schedulingPeriod": "0 sec",
+        "autoTerminatedRelationships": ["success", "failure", "retry"],
+        "position": { "x": 660, "y": 200 }
+      }
+    ],
+    "connections": [
+      {
+        "identifier": "conn-kafka-parse-05",
+        "source": { "id": "proc-consumekafka-05", "type": "PROCESSOR", "groupId": "flow-05-kafka" },
+        "destination": { "id": "proc-parserecord-05", "type": "PROCESSOR", "groupId": "flow-05-kafka" },
+        "selectedRelationships": ["success"]
+      },
+      {
+        "identifier": "conn-parse-putdb-05",
+        "source": { "id": "proc-parserecord-05", "type": "PROCESSOR", "groupId": "flow-05-kafka" },
+        "destination": { "id": "proc-putdb-05", "type": "PROCESSOR", "groupId": "flow-05-kafka" },
+        "selectedRelationships": ["success"]
+      }
+    ],
+    "processGroups": [],
+    "remoteProcessGroups": [],
+    "inputPorts": [],
+    "outputPorts": [],
+    "funnels": [],
+    "labels": [
+      {
+        "identifier": "label-05",
+        "label": "Module 05 : ConsumeKafka -> ParseRecord -> PutDatabaseRecord\nTopic Kafka : nifi-events | Broker : kafka:9092\nNecessite un service Kafka (ajouter au docker-compose si besoin)",
+        "position": { "x": 100, "y": 80 },
+        "width": 700,
+        "height": 90
+      }
+    ]
+  }
+}
