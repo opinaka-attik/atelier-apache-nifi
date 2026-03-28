@@ -1,0 +1,92 @@
+{
+  "encodingVersion": "1.0",
+  "maxTimerDrivenThreadCount": 10,
+  "rootGroup": {
+    "identifier": "flow-01-hello",
+    "instanceIdentifier": "flow-01-hello-inst",
+    "name": "01 - Hello NiFi Flow",
+    "comments": "Premier flow NiFi - Generer des donnees et les logger",
+    "processors": [
+      {
+        "identifier": "proc-gen-01",
+        "instanceIdentifier": "proc-gen-01-inst",
+        "name": "GenerateFlowFile",
+        "comments": "Genere un FlowFile avec un message de test toutes les 5 secondes",
+        "type": "org.apache.nifi.processors.standard.GenerateFlowFile",
+        "bundle": {
+          "group": "org.apache.nifi",
+          "artifact": "nifi-standard-nar",
+          "version": "1.25.0"
+        },
+        "properties": {
+          "File Size": "0B",
+          "Batch Size": "1",
+          "Data Format": "Text",
+          "Unique FlowFiles": "true",
+          "Custom Text": "{\"message\": \"Bonjour Apache NiFi!\", \"timestamp\": \"${now():format('yyyy-MM-dd HH:mm:ss')}\", \"source\": \"atelier-nifi\"}"
+        },
+        "schedulingStrategy": "TIMER_DRIVEN",
+        "schedulingPeriod": "5 sec",
+        "autoTerminatedRelationships": [],
+        "position": { "x": 100, "y": 100 }
+      },
+      {
+        "identifier": "proc-log-01",
+        "instanceIdentifier": "proc-log-01-inst",
+        "name": "LogAttribute",
+        "comments": "Affiche les attributs du FlowFile dans les logs NiFi",
+        "type": "org.apache.nifi.processors.standard.LogAttribute",
+        "bundle": {
+          "group": "org.apache.nifi",
+          "artifact": "nifi-standard-nar",
+          "version": "1.25.0"
+        },
+        "properties": {
+          "Log Level": "info",
+          "Log Payload": "true",
+          "Attributes to Log": "",
+          "Log prefix": "[01-HELLO]"
+        },
+        "schedulingStrategy": "TIMER_DRIVEN",
+        "schedulingPeriod": "0 sec",
+        "autoTerminatedRelationships": ["success"],
+        "position": { "x": 400, "y": 100 }
+      }
+    ],
+    "connections": [
+      {
+        "identifier": "conn-gen-log-01",
+        "instanceIdentifier": "conn-gen-log-01-inst",
+        "name": "",
+        "source": {
+          "id": "proc-gen-01",
+          "type": "PROCESSOR",
+          "groupId": "flow-01-hello"
+        },
+        "destination": {
+          "id": "proc-log-01",
+          "type": "PROCESSOR",
+          "groupId": "flow-01-hello"
+        },
+        "selectedRelationships": ["success"],
+        "backPressureObjectThreshold": 10000,
+        "backPressureDataSizeThreshold": "1 GB"
+      }
+    ],
+    "processGroups": [],
+    "remoteProcessGroups": [],
+    "inputPorts": [],
+    "outputPorts": [],
+    "funnels": [],
+    "labels": [
+      {
+        "identifier": "label-01",
+        "instanceIdentifier": "label-01-inst",
+        "label": "Module 01 : Generer un FlowFile JSON et le logger.\nObjectif : Comprendre le cycle de vie d'un FlowFile.",
+        "position": { "x": 100, "y": 20 },
+        "width": 500,
+        "height": 60
+      }
+    ]
+  }
+}
